@@ -1,7 +1,9 @@
 package com.rastete.stockmarketapp.data.repository
 
+import com.rastete.stockmarketapp.data.csv.CSVParser
 import com.rastete.stockmarketapp.data.local.StockDatabase
 import com.rastete.stockmarketapp.data.mapper.toCompanyListing
+import com.rastete.stockmarketapp.data.mapper.toCompanyListingEntity
 import com.rastete.stockmarketapp.data.remote.StockApi
 import com.rastete.stockmarketapp.domain.model.CompanyListing
 import com.rastete.stockmarketapp.domain.repository.StockRepository
@@ -16,7 +18,8 @@ import javax.inject.Singleton
 @Singleton
 class StockRepositoryImpl @Inject constructor(
     private val api: StockApi,
-    private val db: StockDatabase
+    db: StockDatabase,
+    private val companyListingsParser: CSVParser<CompanyListing>
 ) : StockRepository {
 
     private val dao = db.dao
@@ -26,7 +29,7 @@ class StockRepositoryImpl @Inject constructor(
         query: String
     ): Flow<Resource<List<CompanyListing>>> {
         return flow {
-            emit(Resource.Loading(true))
+            emit(Resource.Loading(isLoading = true))
             val localListings = dao.searchCompanyListing(query)
             emit(Resource.Success(
                 data = localListings.map { it.toCompanyListing() }
@@ -34,18 +37,34 @@ class StockRepositoryImpl @Inject constructor(
 
             val isDbEmpty = localListings.isEmpty() && query.isBlank()
             val shouldJustLoadFromCache = !isDbEmpty && !fetchFromRemote
-            if(shouldJustLoadFromCache){
+            if (shouldJustLoadFromCache) {
                 emit(Resource.Loading(false))
                 return@flow
             }
             val remoteListings = try {
                 val response = api.getListings()
+                companyListingsParser.parse(response.byteStream())
             } catch (e: IOException) {
                 e.printStackTrace()
                 emit(Resource.Error("Couldn't load data"))
+                null
             } catch (e: HttpException) {
                 e.printStackTrace()
                 emit(Resource.Error("Couldn't load data"))
+                null
+            }
+
+            remoteListings?.let { listings ->
+                dao.clearCompanyListings()
+                dao.insertCompanyListings(
+                    listings.map { it.toCompanyListingEntity() }
+                )
+                emit(Resource.Loading(isLoading = false))
+                emit(Resource.Success(
+                    data = dao
+                        .searchCompanyListing("")
+                        .map { it.toCompanyListing() }
+                ))
             }
         }
     }
