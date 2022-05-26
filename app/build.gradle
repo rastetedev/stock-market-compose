@@ -43,6 +43,7 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+        coreLibraryDesugaringEnabled true
     }
     kotlinOptions {
         jvmTarget = '1.8'
@@ -112,4 +113,6 @@ dependencies {
 
     implementation 'io.github.raamcosta.compose-destinations:core:1.5.7-beta'
     ksp 'io.github.raamcosta.compose-destinations:ksp:1.5.7-beta'
+
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.1.5'
 }
