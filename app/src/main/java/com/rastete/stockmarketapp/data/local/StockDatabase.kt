@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 @Database(
+    exportSchema = false,
     entities = [CompanyListingEntity::class],
     version = 1
 )
